@@ -1,0 +1,53 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'arweave-randomx-rs'",
+			"cargo": {
+				"args": [
+					"test",
+					"--lib",
+					"bindings::",
+					"--package=arweave-randomx-rs"
+				],
+				"filter": {
+					"name": "arweave-randomx-rs",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug build.rs",
+			"program": "${workspaceFolder}/target/debug/build/randomx-rs-5c3f3a18d1ce155c/build-script-build",
+			"args": [],
+			"cwd": "${workspaceFolder}",
+			"env": {
+				"CARGO_MANIFEST_DIR": "${workspaceFolder}",
+				"OUT_DIR": "${workspaceFolder}/target/debug/build/randomx-rs-5c3f3a18d1ce155c/out",
+				"TARGET": "your_target_triplet_here",
+				"HOST": "your_host_triplet_here",
+				// any other env vars
+			}
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug Specific Rust Test",
+			"program": "${workspaceFolder}/target/debug/deps/arweave_randomx_rs-8f479ebf584de34b",
+			"args": ["--test", "bindings::tests::calculate_entropy"],
+			"cwd": "${workspaceFolder}",
+			"preLaunchTask": "rust: cargo test",
+			"sourceLanguages": ["rust"]
+
+	}
+	]
+}

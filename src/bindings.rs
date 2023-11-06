@@ -22,6 +22,8 @@
 
 use libc::{c_uint, c_ulong, c_void};
 pub const RANDOMX_HASH_SIZE: u32 = 32;
+pub const RANDOMX_ENTROPY_SIZE: u32 = 256 * 1024; //256KiB
+pub const MAX_CHUNK_SIZE: usize = RANDOMX_ENTROPY_SIZE as usize;
 
 #[repr(C)]
 pub struct randomx_dataset {
@@ -75,11 +77,32 @@ extern "C" {
     );
     pub fn randomx_calculate_hash_last(machine: *mut randomx_vm, output: *mut c_void);
     pub fn randomx_get_flags() -> c_uint;
+
+    // Arweave specific
+    pub fn randomx_calculate_entropy(
+        machine: *mut randomx_vm,
+        input: *const c_void,
+        input_size: usize,
+        out_entropy_size: usize,
+        out_entropy: *mut c_void,
+        randomx_program_count: usize,
+    );
+
+    pub fn randomx_encrypt_chunk(
+        machine: *mut randomx_vm,
+        input: *const c_void,
+        input_size: usize,
+        in_chunk: *const c_void,
+        in_chunk_size: usize,
+        out_chunk: *mut c_void,
+        randomx_program_count: usize,
+    );
+
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ptr;
+    use std::{f32::MAX_EXP, ptr};
 
     use libc::{c_uint, c_void};
 
@@ -182,6 +205,54 @@ mod tests {
             randomx_calculate_hash(vm, input.as_ptr() as _, input.len(), output_ptr);
         }
         assert_eq!(hex::decode(expected).unwrap(), arr);
+
+        unsafe {
+            randomx_destroy_vm(vm);
+            randomx_release_cache(cache);
+        }
+    }
+
+    #[test]
+    fn calculate_entropy() {
+        let key = b"test key 000";
+        let input = b"This is a test";
+        let _expected = b"639183aae1bf4c9a35884cb46b09cad9175f04efd7684e7262a0ac1c2f0b4e3f";
+
+        let flag: c_uint = 0;
+
+        let arr = [0u8; RANDOMX_HASH_SIZE as usize];
+        let _output_ptr = arr.as_ptr() as *mut c_void;
+
+        let cache = unsafe { randomx_alloc_cache(flag) };
+
+        unsafe {
+            randomx_init_cache(cache, key.as_ptr() as _, key.len());
+        }
+
+        let vm = unsafe { randomx_create_vm(flag, cache, ptr::null_mut()) };
+
+        let input_size = input.len();
+        let input_ptr = key.as_ptr() as *const c_void;
+
+        let out_entropy: [u8; MAX_CHUNK_SIZE] = [0; MAX_CHUNK_SIZE];
+        let out_entropy_ptr = out_entropy.as_ptr() as *mut c_void;
+
+        let randomx_program_count = 40;
+
+        unsafe {
+            randomx_calculate_entropy(
+                vm,
+                input_ptr,
+                input_size,
+                MAX_CHUNK_SIZE,
+                out_entropy_ptr,
+                randomx_program_count,
+            )
+        }
+
+        //assert_eq!(hex::decode(expected).unwrap(), arr);
+        let last = out_entropy.last().unwrap();
+        println!("{}", last);
 
         unsafe {
             randomx_destroy_vm(vm);

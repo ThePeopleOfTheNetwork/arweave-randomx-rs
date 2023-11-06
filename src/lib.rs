@@ -38,34 +38,22 @@ mod bindings;
 use std::{convert::TryFrom, num::TryFromIntError, ptr, sync::Arc};
 
 use bindings::{
-    randomx_alloc_cache,
-    randomx_alloc_dataset,
-    randomx_cache,
-    randomx_calculate_hash,
-    randomx_create_vm,
-    randomx_dataset,
-    randomx_dataset_item_count,
-    randomx_destroy_vm,
-    randomx_get_dataset_memory,
-    randomx_init_cache,
-    randomx_init_dataset,
-    randomx_release_cache,
-    randomx_release_dataset,
-    randomx_vm,
-    randomx_vm_set_cache,
-    randomx_vm_set_dataset,
+    randomx_alloc_cache, randomx_alloc_dataset, randomx_cache, randomx_calculate_entropy, randomx_calculate_hash,
+    randomx_create_vm, randomx_dataset, randomx_dataset_item_count, randomx_destroy_vm, randomx_encrypt_chunk,
+    randomx_get_dataset_memory, randomx_init_cache, randomx_init_dataset, randomx_release_cache,
+    randomx_release_dataset, randomx_vm, randomx_vm_set_cache, randomx_vm_set_dataset, MAX_CHUNK_SIZE,
     RANDOMX_HASH_SIZE,
 };
+
 use bitflags::bitflags;
 use libc::{c_ulong, c_void};
 use thiserror::Error;
 
 use crate::bindings::{
-    randomx_calculate_hash_first,
-    randomx_calculate_hash_last,
-    randomx_calculate_hash_next,
-    randomx_get_flags,
+    randomx_calculate_hash_first, randomx_calculate_hash_last, randomx_calculate_hash_next, randomx_get_flags,
 };
+
+pub const ARWEAVE_CHUNK_SIZE: usize = MAX_CHUNK_SIZE;
 
 bitflags! {
     /// RandomX Flags are used to configure the library.
@@ -260,7 +248,7 @@ impl RandomXDataset {
                 // This weirdness brought to you by c_ulong being different on Windows and Linux
                 #[cfg(target_os = "windows")]
                 return Ok(x);
-                #[cfg(target_os = "linux")]
+                #[cfg(not(target_os = "windows"))]
                 return Ok(u32::try_from(x)?);
             },
         }
@@ -406,6 +394,83 @@ impl RandomXVM {
                 Ok(result)
             }
         }
+    }
+
+    /// Similar to ar_mine_randomx.c encrypt_chunk()
+    /// TODO: possibly remove now that fiestel_encrypt will be at teh arweave_rs level
+    pub fn encrypt_chunk(
+        &self,
+        input: &[u8],
+        in_chunk: &[u8],
+        randomx_program_count: usize,
+    ) -> Result<Vec<u8>, RandomXError> {
+        let input_ptr = input.as_ptr() as *mut c_void;
+        let input_size = input.len();
+
+        let in_chunk_ptr = in_chunk.as_ptr() as *mut c_void;
+        let in_chunk_size = in_chunk.len();
+
+        let out_chunk: [u8; MAX_CHUNK_SIZE] = [0; MAX_CHUNK_SIZE];
+        let out_chunk_ptr = out_chunk.as_ptr() as *mut c_void;
+
+        // If the chunk isn't MAX_CHUNK_SIZE in length we'll need to pad it
+        // for the randomX encryption to be consistent.
+        if in_chunk_size < MAX_CHUNK_SIZE {
+            let mut padded_in_chunk: [u8; MAX_CHUNK_SIZE] = [0; MAX_CHUNK_SIZE];
+            padded_in_chunk.copy_from_slice(in_chunk);
+            let padded_in_chunk_ptr = padded_in_chunk.as_mut_ptr() as *mut c_void;
+            unsafe {
+                randomx_encrypt_chunk(
+                    self.vm,
+                    input_ptr,
+                    input_size,
+                    padded_in_chunk_ptr,
+                    MAX_CHUNK_SIZE,
+                    out_chunk_ptr,
+                    randomx_program_count,
+                )
+            }
+        } else {
+            unsafe {
+                randomx_encrypt_chunk(
+                    self.vm,
+                    input_ptr,
+                    input_size,
+                    in_chunk_ptr,
+                    in_chunk_size,
+                    out_chunk_ptr,
+                    randomx_program_count,
+                )
+            }
+        }
+        Ok(out_chunk.to_vec())
+    }
+
+    pub fn calculate_entropy(
+        &self,
+        input: &[u8],
+        entropy_size: usize,
+        randomx_program_count: usize,
+    ) -> Result<Vec<u8>, RandomXError> {
+        let input_ptr = input.as_ptr() as *mut c_void;
+        let input_size = input.len();
+
+        let out_entropy_size = entropy_size;
+        let mut out_entropy: Vec<u8> = vec![0; entropy_size];
+        let out_entropy_ptr = out_entropy.as_mut_ptr() as *mut c_void;
+
+        unsafe {
+            randomx_calculate_entropy(
+                self.vm,
+                input_ptr,
+                input_size,
+                out_entropy_size,
+                out_entropy_ptr,
+                randomx_program_count,
+            );
+        }
+
+        Ok(out_entropy.to_vec())
     }
 
     /// Calculates hashes from a set of inputs.
@@ -609,10 +674,13 @@ mod tests {
         let dataset = RandomXDataset::new(flags, cache.clone(), 0).unwrap();
         let vm = RandomXVM::new(flags, Some(cache.clone()), Some(dataset.clone())).unwrap();
         let hash = vm.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm);
         drop(dataset);
         drop(cache);
@@ -621,10 +689,13 @@ mod tests {
         let dataset1 = RandomXDataset::new(flags, cache1.clone(), 0).unwrap();
         let vm1 = RandomXVM::new(flags, Some(cache1.clone()), Some(dataset1.clone())).unwrap();
         let hash1 = vm1.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash1, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash1,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm1);
         drop(dataset1);
         drop(cache1);
@@ -641,10 +712,13 @@ mod tests {
         drop(dataset);
         drop(cache);
         let hash = vm.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm);
 
         let cache1 = RandomXCache::new(flags, key.as_bytes()).unwrap();
@@ -653,10 +727,13 @@ mod tests {
         drop(dataset1);
         drop(cache1);
         let hash1 = vm1.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash1, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash1,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm1);
     }
 

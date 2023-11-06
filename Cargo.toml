@@ -1,12 +1,12 @@
 [package]
-name = "randomx-rs"
+name = "arweave-randomx-rs"
 description = "Rust bindings for the RandomX Proof-of-Work"
-authors = ["The Tari Development Community"]
-repository = "https://github.com/tari-project/randomx-rs"
+authors = ["The Tari Development Community", "The People of the Network"]
+repository = "https://github.com/ThePeopleOfTheNetwork/arweave-randomx-rs"
 homepage = "https://tari.com"
 readme = "README.md"
 license = "BSD-3-Clause"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2018"
 build = "build.rs"
 
