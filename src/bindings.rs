@@ -21,8 +21,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use libc::{c_uint, c_ulong, c_void};
-pub const RANDOMX_HASH_SIZE: u32 = 32;
-pub const RANDOMX_ENTROPY_SIZE: u32 = 256 * 1024; //256KiB
+pub const RANDOMX_HASH_SIZE: usize = 32;
+pub const RANDOMX_ENTROPY_SIZE: usize = 256 * 1024; //256KiB
 pub const MAX_CHUNK_SIZE: usize = RANDOMX_ENTROPY_SIZE as usize;
 
 #[repr(C)]
@@ -98,6 +98,14 @@ extern "C" {
         randomx_program_count: usize,
     );
 
+    pub fn randomx_calculate_hash_long_with_entropy(
+        machine: *mut randomx_vm,
+        input: *const c_void,
+        input_size: usize,
+        out_hash: *mut c_void,    // RANDOMX_HASH_SIZE
+        out_entropy: *mut c_void, // RANDOMX_ENTROPY_SIZE
+        randomx_program_count: usize,
+    );
 }
 
 #[cfg(test)]

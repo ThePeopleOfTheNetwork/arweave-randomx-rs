@@ -39,10 +39,10 @@ use std::{convert::TryFrom, num::TryFromIntError, ptr, sync::Arc};
 
 use bindings::{
     randomx_alloc_cache, randomx_alloc_dataset, randomx_cache, randomx_calculate_entropy, randomx_calculate_hash,
-    randomx_create_vm, randomx_dataset, randomx_dataset_item_count, randomx_destroy_vm, randomx_encrypt_chunk,
-    randomx_get_dataset_memory, randomx_init_cache, randomx_init_dataset, randomx_release_cache,
-    randomx_release_dataset, randomx_vm, randomx_vm_set_cache, randomx_vm_set_dataset, MAX_CHUNK_SIZE,
-    RANDOMX_HASH_SIZE,
+    randomx_calculate_hash_long_with_entropy, randomx_create_vm, randomx_dataset, randomx_dataset_item_count,
+    randomx_destroy_vm, randomx_encrypt_chunk, randomx_get_dataset_memory, randomx_init_cache, randomx_init_dataset,
+    randomx_release_cache, randomx_release_dataset, randomx_vm, randomx_vm_set_cache, randomx_vm_set_dataset,
+    MAX_CHUNK_SIZE, RANDOMX_ENTROPY_SIZE, RANDOMX_HASH_SIZE,
 };
 
 use bitflags::bitflags;
@@ -340,7 +340,7 @@ impl RandomXVM {
         }
     }
 
-    /// Re-initializes the `VM` with a new cache that was initialised without
+    /// Re-initializes the `VM` with a new cache that was initialized without
     /// RandomXFlag::FLAG_FULL_MEM.
     pub fn reinit_cache(&mut self, cache: RandomXCache) -> Result<(), RandomXError> {
         if self.flags.contains(RandomXFlag::FLAG_FULL_MEM) {
@@ -471,6 +471,34 @@ impl RandomXVM {
         }
 
         Ok(out_entropy.to_vec())
+    }
+
+    pub fn calculate_hash_with_entropy(
+        &self,
+        input: &[u8],
+        randomx_program_count: usize,
+    ) -> Result<([u8; RANDOMX_HASH_SIZE], [u8; RANDOMX_ENTROPY_SIZE]), RandomXError> {
+        let input_ptr = input.as_ptr() as *mut c_void;
+        let input_size = input.len();
+
+        let mut out_hash = [0u8; RANDOMX_HASH_SIZE];
+        let out_hash_ptr = out_hash.as_mut_ptr() as *mut c_void;
+
+        let mut out_entropy = [0u8; RANDOMX_ENTROPY_SIZE];
+        let out_entropy_ptr = out_entropy.as_mut_ptr() as *mut c_void;
+
+        unsafe {
+            randomx_calculate_hash_long_with_entropy(
+                self.vm,
+                input_ptr,
+                input_size,
+                out_hash_ptr,
+                out_entropy_ptr,
+                randomx_program_count,
+            );
+        }
+
+        Ok((out_hash, out_entropy))
     }
 
     /// Calculates hashes from a set of inputs.
