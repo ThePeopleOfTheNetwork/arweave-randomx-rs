@@ -80,6 +80,41 @@ bitflags! {
     }
 }
 
+
+pub enum RandomXMode {
+    FastHashing,
+    FastInitialization,
+    LargePages,
+}
+
+pub fn create_randomx_vm(mode: RandomXMode, packing_key: &[u8]) -> RandomXVM {
+    let key = packing_key;
+    let flags: RandomXFlag;
+    let cache: RandomXCache;
+    let dataset: Option<RandomXDataset>;
+
+    match mode {
+        RandomXMode::FastHashing => {
+            // FLAG_FULL_MEM is similar to HASH_FAST in the Erlang code.
+            flags = RandomXFlag::get_recommended_flags() | RandomXFlag::FLAG_FULL_MEM | RandomXFlag::FLAG_HARD_AES;
+            cache = RandomXCache::new(flags, key).unwrap();
+            dataset = Some(RandomXDataset::new(flags, cache.clone(), 0).expect("Failed to allocate dataset"));
+        },
+        RandomXMode::LargePages => {
+            flags = RandomXFlag::get_recommended_flags() | RandomXFlag::FLAG_FULL_MEM | RandomXFlag::FLAG_LARGE_PAGES;
+            cache = RandomXCache::new(flags, key).unwrap();
+            dataset = Some(RandomXDataset::new(flags, cache.clone(), 0).expect("Failed to allocate dataset"));
+        },
+        RandomXMode::FastInitialization => {
+            flags = RandomXFlag::get_recommended_flags();
+            cache = RandomXCache::new(flags, key).unwrap();
+            dataset = None;
+        },
+    }
+    RandomXVM::new(flags, Some(cache), dataset).unwrap()
+}
+
+
 impl RandomXFlag {
     /// Returns the recommended flags to be used.
     ///
