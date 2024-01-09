@@ -56,16 +56,16 @@ use bindings::{
     randomx_vm_set_dataset,
     RANDOMX_HASH_SIZE,
 };
+
 use bitflags::bitflags;
 use libc::{c_ulong, c_void};
 use thiserror::Error;
 
 use crate::bindings::{
-    randomx_calculate_hash_first,
-    randomx_calculate_hash_last,
-    randomx_calculate_hash_next,
-    randomx_get_flags,
+    randomx_calculate_hash_first, randomx_calculate_hash_last, randomx_calculate_hash_next, randomx_get_flags,
 };
+
+pub const ARWEAVE_CHUNK_SIZE: usize = MAX_CHUNK_SIZE;
 
 bitflags! {
     /// RandomX Flags are used to configure the library.
@@ -91,6 +91,41 @@ bitflags! {
         const FLAG_ARGON2       = 0b0110_0000;
     }
 }
+
+
+pub enum RandomXMode {
+    FastHashing,
+    FastInitialization,
+    LargePages,
+}
+
+pub fn create_randomx_vm(mode: RandomXMode, packing_key: &[u8]) -> RandomXVM {
+    let key = packing_key;
+    let flags: RandomXFlag;
+    let cache: RandomXCache;
+    let dataset: Option<RandomXDataset>;
+
+    match mode {
+        RandomXMode::FastHashing => {
+            // FLAG_FULL_MEM is similar to HASH_FAST in the Erlang code.
+            flags = RandomXFlag::get_recommended_flags() | RandomXFlag::FLAG_FULL_MEM | RandomXFlag::FLAG_HARD_AES;
+            cache = RandomXCache::new(flags, key).unwrap();
+            dataset = Some(RandomXDataset::new(flags, cache.clone(), 0).expect("Failed to allocate dataset"));
+        },
+        RandomXMode::LargePages => {
+            flags = RandomXFlag::get_recommended_flags() | RandomXFlag::FLAG_FULL_MEM | RandomXFlag::FLAG_LARGE_PAGES;
+            cache = RandomXCache::new(flags, key).unwrap();
+            dataset = Some(RandomXDataset::new(flags, cache.clone(), 0).expect("Failed to allocate dataset"));
+        },
+        RandomXMode::FastInitialization => {
+            flags = RandomXFlag::get_recommended_flags();
+            cache = RandomXCache::new(flags, key).unwrap();
+            dataset = None;
+        },
+    }
+    RandomXVM::new(flags, Some(cache), dataset).unwrap()
+}
+
 
 impl RandomXFlag {
     /// Returns the recommended flags to be used.
@@ -352,7 +387,7 @@ impl RandomXVM {
         }
     }
 
-    /// Re-initializes the `VM` with a new cache that was initialised without
+    /// Re-initializes the `VM` with a new cache that was initialized without
     /// RandomXFlag::FLAG_FULL_MEM.
     pub fn reinit_cache(&mut self, cache: RandomXCache) -> Result<(), RandomXError> {
         if self.flags.contains(RandomXFlag::FLAG_FULL_MEM) {
@@ -609,10 +644,13 @@ mod tests {
         let dataset = RandomXDataset::new(flags, cache.clone(), 0).unwrap();
         let vm = RandomXVM::new(flags, Some(cache.clone()), Some(dataset.clone())).unwrap();
         let hash = vm.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm);
         drop(dataset);
         drop(cache);
@@ -621,10 +659,13 @@ mod tests {
         let dataset1 = RandomXDataset::new(flags, cache1.clone(), 0).unwrap();
         let vm1 = RandomXVM::new(flags, Some(cache1.clone()), Some(dataset1.clone())).unwrap();
         let hash1 = vm1.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash1, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash1,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm1);
         drop(dataset1);
         drop(cache1);
@@ -641,10 +682,13 @@ mod tests {
         drop(dataset);
         drop(cache);
         let hash = vm.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm);
 
         let cache1 = RandomXCache::new(flags, key.as_bytes()).unwrap();
@@ -653,10 +697,13 @@ mod tests {
         drop(dataset1);
         drop(cache1);
         let hash1 = vm1.calculate_hash(input.as_bytes()).expect("no data");
-        assert_eq!(hash1, [
-            114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
-            172, 253, 155, 204, 111, 183, 213, 157, 155
-        ]);
+        assert_eq!(
+            hash1,
+            [
+                114, 81, 192, 5, 165, 242, 107, 100, 184, 77, 37, 129, 52, 203, 217, 227, 65, 83, 215, 213, 59, 71, 32,
+                172, 253, 155, 204, 111, 183, 213, 157, 155
+            ]
+        );
         drop(vm1);
     }
 
