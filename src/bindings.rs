@@ -23,7 +23,6 @@
 use libc::{c_uint, c_ulong, c_void};
 pub const RANDOMX_HASH_SIZE: usize = 32;
 pub const RANDOMX_ENTROPY_SIZE: usize = 256 * 1024; //256KiB
-pub const MAX_CHUNK_SIZE: usize = RANDOMX_ENTROPY_SIZE as usize;
 
 #[repr(C)]
 pub struct randomx_dataset {
@@ -88,15 +87,16 @@ extern "C" {
         randomx_program_count: usize,
     );
 
-    pub fn randomx_encrypt_chunk(
-        machine: *mut randomx_vm,
-        input: *const c_void,
-        input_size: usize,
-        in_chunk: *const c_void,
-        in_chunk_size: usize,
-        out_chunk: *mut c_void,
-        randomx_program_count: usize,
-    );
+    // TODO: Probably wont use because we'll separate packing and feistel encryption
+    // pub fn randomx_encrypt_chunk(
+    //     machine: *mut randomx_vm,
+    //     input: *const c_void,
+    //     input_size: usize,
+    //     in_chunk: *const c_void,
+    //     in_chunk_size: usize,
+    //     out_chunk: *mut c_void,
+    //     randomx_program_count: usize,
+    // );
 
     pub fn randomx_calculate_hash_long_with_entropy(
         machine: *mut randomx_vm,
@@ -242,7 +242,7 @@ mod tests {
         let input_size = input.len();
         let input_ptr = key.as_ptr() as *const c_void;
 
-        let out_entropy: [u8; MAX_CHUNK_SIZE] = [0; MAX_CHUNK_SIZE];
+        let out_entropy: [u8; RANDOMX_ENTROPY_SIZE] = [0; RANDOMX_ENTROPY_SIZE];
         let out_entropy_ptr = out_entropy.as_ptr() as *mut c_void;
 
         let randomx_program_count = 40;
@@ -252,7 +252,7 @@ mod tests {
                 vm,
                 input_ptr,
                 input_size,
-                MAX_CHUNK_SIZE,
+                RANDOMX_ENTROPY_SIZE,
                 out_entropy_ptr,
                 randomx_program_count,
             )
