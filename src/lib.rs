@@ -53,8 +53,6 @@ use crate::bindings::{
     randomx_calculate_hash_first, randomx_calculate_hash_last, randomx_calculate_hash_next, randomx_get_flags,
 };
 
-pub const ARWEAVE_CHUNK_SIZE: usize = MAX_CHUNK_SIZE;
-
 bitflags! {
     /// RandomX Flags are used to configure the library.
     pub struct RandomXFlag: u32 {
@@ -484,14 +482,13 @@ impl RandomXVM {
     pub fn calculate_entropy(
         &self,
         input: &[u8],
-        entropy_size: usize,
         randomx_program_count: usize,
-    ) -> Result<Vec<u8>, RandomXError> {
+    ) -> Result<[u8;RANDOMX_ENTROPY_SIZE], RandomXError> {
         let input_ptr = input.as_ptr() as *mut c_void;
         let input_size = input.len();
 
-        let out_entropy_size = entropy_size;
-        let mut out_entropy: Vec<u8> = vec![0; entropy_size];
+        let out_entropy_size = RANDOMX_ENTROPY_SIZE;
+        let mut out_entropy = [0u8;RANDOMX_ENTROPY_SIZE];
         let out_entropy_ptr = out_entropy.as_mut_ptr() as *mut c_void;
 
         unsafe {
@@ -505,7 +502,13 @@ impl RandomXVM {
             );
         }
 
-        Ok(out_entropy.to_vec())
+        // if this failed, out_entropy should still be empty
+        let is_all_zeros = out_entropy.iter().all(|&x| x == 0);
+        if is_all_zeros {
+            Err(RandomXError::Other("RandomX calculated entropy was empty".to_string()))
+        } else {
+            Ok(out_entropy)
+        }
     }
 
     pub fn calculate_hash_with_entropy(
