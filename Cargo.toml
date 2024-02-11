@@ -1,5 +1,5 @@
 [package]
-name = "arweave-randomx-rs"
+name = "arweave_rs_randomx"
 description = "Rust bindings for the RandomX Proof-of-Work"
 authors = ["The Tari Development Community", "The People of the Network"]
 repository = "https://github.com/ThePeopleOfTheNetwork/arweave-randomx-rs"
