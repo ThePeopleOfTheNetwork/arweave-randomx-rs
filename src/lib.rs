@@ -523,10 +523,11 @@ impl RandomXVM {
             )
         }
 
-        let is_all_zeros = out_entropy.iter().all(|&x| x == 0);
-        if is_all_zeros {
-            return Err(RandomXError::Other("Entropy was zero".to_string()));
-        }
+        // Commented out for better speed
+        // let is_all_zeros = out_entropy.iter().all(|&x| x == 0);
+        // if is_all_zeros {
+        //     return Err(RandomXError::Other("Entropy was zero".to_string()));
+        // }
 
         Ok(out_entropy)
     }
@@ -559,15 +560,16 @@ impl RandomXVM {
             )
         }
 
-        let is_all_zeros = out_hash.iter().all(|&x| x == 0);
-        if is_all_zeros {
-            return Err(RandomXError::Other("Hash was zero".to_string()));
-        }
+         // Commented out for better speed
+        // let is_all_zeros = out_hash.iter().all(|&x| x == 0);
+        // if is_all_zeros {
+        //     return Err(RandomXError::Other("Hash was zero".to_string()));
+        // }
 
-        let is_all_zeros = out_entropy.iter().all(|&x| x == 0);
-        if is_all_zeros {
-            return Err(RandomXError::Other("Entropy was zero".to_string()));
-        }
+        // let is_all_zeros = out_entropy.iter().all(|&x| x == 0);
+        // if is_all_zeros {
+        //     return Err(RandomXError::Other("Entropy was zero".to_string()));
+        // }
 
         Ok((out_hash, out_entropy))
     }
