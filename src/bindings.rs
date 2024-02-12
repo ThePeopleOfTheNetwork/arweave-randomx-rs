@@ -202,7 +202,7 @@ mod tests {
 
         let flag: c_uint = 0;
 
-        let arr = [0u8; RANDOMX_HASH_SIZE as usize];
+        let arr = [0u8; RANDOMX_HASH_SIZE];
         let output_ptr = arr.as_ptr() as *mut c_void;
 
         let cache = unsafe { randomx_alloc_cache(flag) };
@@ -232,7 +232,7 @@ mod tests {
 
         let flag: c_uint = 0;
 
-        let arr = [0u8; RANDOMX_HASH_SIZE as usize];
+        let arr = [0u8; RANDOMX_HASH_SIZE];
         let _output_ptr = arr.as_ptr() as *mut c_void;
 
         let cache = unsafe { randomx_alloc_cache(flag) };
@@ -287,7 +287,7 @@ mod tests {
 
         let flag: c_uint = 0;
 
-        let arr = [0u8; RANDOMX_HASH_SIZE as usize];
+        let arr = [0u8; RANDOMX_HASH_SIZE];
         let output_ptr = arr.as_ptr() as *mut c_void;
 
         let cache = unsafe { randomx_alloc_cache(flag) };

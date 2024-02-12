@@ -34,6 +34,9 @@
 //!
 //! [RandomX github repo]: <https://github.com/tevador/RandomX>
 //! [design document]: <https://github.com/tevador/RandomX/blob/master/doc/design.md>
+
+#![allow(clippy::bad_bit_mask)]
+
 mod bindings;
 use std::{convert::TryFrom, num::TryFromIntError, ptr, sync::Arc};
 
@@ -53,9 +56,9 @@ use crate::bindings::{
     randomx_calculate_hash_first, randomx_calculate_hash_last, randomx_calculate_hash_next, randomx_get_flags,
 };
 
-
 bitflags! {
     /// RandomX Flags are used to configure the library.
+
     pub struct RandomXFlag: u32 {
         /// No flags set. Works on all platforms, but is the slowest.
         const FLAG_DEFAULT      = 0b0000_0000;
@@ -192,6 +195,7 @@ impl RandomXCache {
                 Err(RandomXError::CreationError("Could not allocate cache".to_string()))
             } else {
                 let inner = RandomXCacheInner { cache_ptr: test };
+                #[allow(clippy::arc_with_non_send_sync)]
                 let result = RandomXCache { inner: Arc::new(inner) };
                 let key_ptr = key.as_ptr() as *mut c_void;
                 let key_size = key.len();
@@ -252,6 +256,7 @@ impl RandomXDataset {
                 dataset_count: item_count,
                 cache,
             };
+            #[allow(clippy::arc_with_non_send_sync)]
             let result = RandomXDataset { inner: Arc::new(inner) };
 
             if start < item_count {
@@ -413,13 +418,13 @@ impl RandomXVM {
         } else {
             let size_input = input.len();
             let input_ptr = input.as_ptr() as *mut c_void;
-            let arr = [0; RANDOMX_HASH_SIZE as usize];
+            let arr = [0; RANDOMX_HASH_SIZE];
             let output_ptr = arr.as_ptr() as *mut c_void;
             unsafe {
                 randomx_calculate_hash(self.vm, input_ptr, size_input, output_ptr);
             }
             // if this failed, arr should still be empty
-            if arr == [0; RANDOMX_HASH_SIZE as usize] {
+            if arr == [0; RANDOMX_HASH_SIZE] {
                 Err(RandomXError::Other("RandomX calculated hash was empty".to_string()))
             } else {
                 let result = arr.to_vec();
@@ -448,7 +453,7 @@ impl RandomXVM {
 
         // For multiple inputs
         let mut output_ptr: *mut c_void = ptr::null_mut();
-        let arr = [0; RANDOMX_HASH_SIZE as usize];
+        let arr = [0; RANDOMX_HASH_SIZE];
 
         // Not len() as last iteration assigns final hash
         let iterations = input.len() + 1;
@@ -461,7 +466,7 @@ impl RandomXVM {
             } else {
                 if input[i].is_empty() {
                     // Stop calculations
-                    if arr != [0; RANDOMX_HASH_SIZE as usize] {
+                    if arr != [0; RANDOMX_HASH_SIZE] {
                         // Complete what was started
                         unsafe {
                             randomx_calculate_hash_last(self.vm, output_ptr);
@@ -487,7 +492,7 @@ impl RandomXVM {
 
             if i != 0 {
                 // First hash is only available in 2nd iteration
-                if arr == [0; RANDOMX_HASH_SIZE as usize] {
+                if arr == [0; RANDOMX_HASH_SIZE] {
                     return Err(RandomXError::Other("RandomX hash was zero".to_string()));
                 }
                 let output: Vec<u8> = arr.to_vec();
@@ -619,7 +624,7 @@ mod tests {
         let dataset = RandomXDataset::new(flags, cache.clone(), 0).unwrap();
         let memory = dataset.get_data().unwrap_or_else(|_| std::vec::Vec::new());
         assert!(!memory.is_empty(), "Failed to get dataset memory");
-        let vec = vec![0u8; memory.len() as usize];
+        let vec = vec![0u8; memory.len()];
         assert_ne!(memory, vec);
         drop(dataset);
         drop(cache);
@@ -634,7 +639,7 @@ mod tests {
         let cache1 = RandomXCache::new(flags, key.as_bytes()).unwrap();
         let mut vm1 = RandomXVM::new(flags, Some(cache1.clone()), None).unwrap();
         let hash1 = vm1.calculate_hash(input.as_bytes()).expect("no data");
-        let vec = vec![0u8; hash1.len() as usize];
+        let vec = vec![0u8; hash1.len()];
         assert_ne!(hash1, vec);
         let reinit_cache = vm1.reinit_cache(cache1.clone());
         assert!(reinit_cache.is_ok());
@@ -686,7 +691,7 @@ mod tests {
         assert_eq!(inputs.len(), hashes.len());
         let mut prev_hash = Vec::new();
         for (i, hash) in hashes.into_iter().enumerate() {
-            let vec = vec![0u8; hash.len() as usize];
+            let vec = vec![0u8; hash.len()];
             assert_ne!(hash, vec);
             assert_ne!(hash, prev_hash);
             let compare = vm.calculate_hash(inputs[i]).unwrap(); // sanity check
