@@ -25,16 +25,19 @@ pub const RANDOMX_HASH_SIZE: usize = 32;
 pub const RANDOMX_ENTROPY_SIZE: usize = 256 * 1024; //256KiB
 
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct randomx_dataset {
     _unused: [u8; 0],
 }
 
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct randomx_cache {
     _unused: [u8; 0],
 }
 
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct randomx_vm {
     _unused: [u8; 0],
 }
@@ -110,6 +113,7 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use std::{f32::MAX_EXP, ptr};
 
     use libc::{c_uint, c_void};
